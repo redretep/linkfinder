@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Reverse IP & Domain Finder</title>
+  <title>linkfinder by redretep</title>
   <style>
     :root {
       --bg: #0f1117;
@@ -97,23 +97,23 @@
 <body>
 
 <div class="container">
-  <h2>Reverse IP & Host Lookup</h2>
+  <h2>reverse ip/domain lookup</h2>
   <div class="input-group">
-    <input type="text" id="targetUrl" placeholder="e.g. example.com or https://example.com" />
-    <button id="searchBtn" onclick="runLookup()">Lookup</button>
+    <input type="text" id="targetUrl" placeholder="https://example.com" />
+    <button id="searchBtn" onclick="runLookup()">find ip and domains</button>
   </div>
 
   <div id="metaBox" class="meta-box">
-    <div class="meta-item"><span>Hostname:</span> <strong id="outHost">-</strong></div>
-    <div class="meta-item"><span>Resolved IP:</span> <strong id="outIp">-</strong></div>
-    <div class="meta-item"><span>Total Found:</span> <strong id="outCount">0</strong></div>
+    <div class="meta-item"><span>hostname:</span> <strong id="outHost">-</strong></div>
+    <div class="meta-item"><span>IP:</span> <strong id="outIp">-</strong></div>
+    <div class="meta-item"><span>total found:</span> <strong id="outCount">0</strong></div>
   </div>
 
   <ul id="resultsList" class="results-list"></ul>
-  <button id="copyBtn" class="copy-btn" onclick="copyAllLinks()">Copy Clickable Links for Google Docs</button>
+  <button id="copyBtn" class="copy-btn" onclick="copyAllLinks()">copy all links</button>
   <div id="status" class="status"></div>
 </div>
-
+made by redretep
 <script>
 function cleanDomain(input) {
   let val = input.trim();
