@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Reverse IP & Domain Finder</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card: #181b26;
+      --accent: #3b82f6;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --border: #2e3446;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .container {
+      width: 100%;
+      max-width: 650px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    h2 { margin-top: 0; font-size: 1.4rem; }
+    .input-group { display: flex; gap: 8px; margin-bottom: 20px; }
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0d1017;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+    input:focus { outline: 1px solid var(--accent); }
+    button {
+      padding: 12px 20px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    .meta-box {
+      background: #111420;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .meta-item { margin-bottom: 6px; }
+    .meta-item:last-child { margin-bottom: 0; }
+    .meta-item span { color: var(--muted); }
+    .results-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: 320px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0d1017;
+      display: none;
+    }
+    .results-list li {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1c2132;
+      font-size: 0.9rem;
+      word-break: break-all;
+    }
+    .results-list li:last-child { border-bottom: none; }
+    .results-list a { color: #60a5fa; text-decoration: underline; }
+    .copy-btn {
+      margin-top: 14px;
+      width: 100%;
+      background: #2563eb;
+      display: none;
+    }
+    .status { font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Reverse IP & Host Lookup</h2>
+  <div class="input-group">
+    <input type="text" id="targetUrl" placeholder="e.g. example.com or https://example.com" />
+    <button id="searchBtn" onclick="runLookup()">Lookup</button>
+  </div>
+
+  <div id="metaBox" class="meta-box">
+    <div class="meta-item"><span>Hostname:</span> <strong id="outHost">-</strong></div>
+    <div class="meta-item"><span>Resolved IP:</span> <strong id="outIp">-</strong></div>
+    <div class="meta-item"><span>Total Found:</span> <strong id="outCount">0</strong></div>
+  </div>
+
+  <ul id="resultsList" class="results-list"></ul>
+  <button id="copyBtn" class="copy-btn" onclick="copyAllLinks()">Copy Clickable Links for Google Docs</button>
+  <div id="status" class="status"></div>
+</div>
+
+<script>
+function cleanDomain(input) {
+  let val = input.trim();
+  if (!/^https?:\/\//i.test(val)) val = 'http://' + val;
+  try {
+    return new URL(val).hostname;
+  } catch (e) {
+    return input.trim();
+  }
+}
+
+async function runLookup() {
+  const input = document.getElementById('targetUrl').value;
+  const status = document.getElementById('status');
+  const metaBox = document.getElementById('metaBox');
+  const resultsList = document.getElementById('resultsList');
+  const copyBtn = document.getElementById('copyBtn');
+  
+  if (!input) return;
+
+  const domain = cleanDomain(input);
+  status.textContent = 'Resolving IP address...';
+  metaBox.style.display = 'none';
+  resultsList.style.display = 'none';
+  copyBtn.style.display = 'none';
+  resultsList.innerHTML = '';
+
+  try {
+    // 1. Resolve domain via Cloudflare DoH
+    const dnsRes = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=A`, {
+      headers: { 'Accept': 'application/dns-json' }
+    });
+    const dnsData = await dnsRes.json();
+    
+    if (!dnsData.Answer || dnsData.Answer.length === 0) {
+      status.textContent = `Could not resolve A record for ${domain}`;
+      return;
+    }
+
+    const ip = dnsData.Answer.find(r => r.type === 1)?.data;
+    if (!ip) {
+      status.textContent = `No IPv4 address found for ${domain}`;
+      return;
+    }
+
+    document.getElementById('outHost').textContent = domain;
+    document.getElementById('outIp').textContent = ip;
+    status.textContent = `Resolved IP: ${ip}. Searching for hosted domains...`;
+
+    // 2. Fetch Reverse IP results
+    const targetApi = `https://api.hackertarget.com/reverseiplookup/?q=${ip}`;
+    let resText = '';
+    try {
+      const resp = await fetch(targetApi);
+      resText = await resp.text();
+    } catch {
+      const resp = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetApi)}`);
+      resText = await resp.text();
+    }
+
+    if (resText.includes('API count exceeded') || resText.includes('No records')) {
+      status.textContent = resText;
+      return;
+    }
+
+    const rawList = resText.split('\n').map(d => d.trim()).filter(Boolean);
+    document.getElementById('outCount').textContent = rawList.length;
+
+    rawList.forEach(item => {
+      const li = document.createElement('li');
+      li.innerHTML = `<a href="https://${item}" target="_blank" rel="noopener">https://${item}</a>`;
+      resultsList.appendChild(li);
+    });
+
+    metaBox.style.display = 'block';
+    resultsList.style.display = 'block';
+    if (rawList.length > 0) copyBtn.style.display = 'block';
+    status.textContent = `Complete. Found ${rawList.length} domains.`;
+
+  } catch (err) {
+    status.textContent = `Error: ${err.message}`;
+  }
+}
+
+async function copyAllLinks() {
+  const anchors = Array.from(document.querySelectorAll('#resultsList a'));
+  if (anchors.length === 0) return;
+
+  // Rich HTML formatted bulleted list with active anchor tags
+  const htmlList = '<ul>' + anchors.map(a => `<li><a href="${a.href}">${a.href}</a></li>`).join('') + '</ul>';
+  const plainText = anchors.map(a => a.href).join('\n');
+
+  try {
+    const blobHtml = new Blob([htmlList], { type: 'text/html' });
+    const blobText = new Blob([plainText], { type: 'text/plain' });
+
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html': blobHtml,
+        'text/plain': blobText
+      })
+    ]);
+
+    alert(`Copied ${anchors.length} links! They will paste into Google Docs as blue, clickable hyperlinks.`);
+  } catch (err) {
+    // Fallback if permission is blocked
+    navigator.clipboard.writeText(plainText);
+    alert('Copied as plain text.');
+  }
+}
+</script>
+</body>
+</html>
